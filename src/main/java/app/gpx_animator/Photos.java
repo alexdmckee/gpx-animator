@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -114,19 +115,62 @@ public final class Photos {
             final Graphics2D g2d = bi2.createGraphics();
             final int posX = (bi.getWidth() - image.getWidth()) / 2;
             final int posY = (bi.getHeight() - image.getHeight()) / 2;
-            g2d.drawImage(image, posX, posY, null);
-            g2d.dispose();
+           // g2d.drawImage(image, posX, posY, null);
+           // g2d.dispose();
 
             final long ms = cfg.getPhotoTime();
             final long fps = Double.valueOf(cfg.getFps()).longValue();
             final long frames = ms * fps / 1_000;
 
-            try {
-                for (long frame = 0; frame < frames; frame++) {
-                    frameWriter.addFrame(bi2);
+            // fade in photo if frames >= 90
+            // for fps/2 increase image size from 10x10 to full size
+
+            // add on (x) each time
+
+            int scaleX = (int) ((image.getWidth() - 10) / (fps / 2));
+            int scaleY = (int) ((image.getHeight() - 10) / (fps / 2));
+            int accX = 10;
+            int accY = 10;
+            int minMs = 3000;
+            ArrayList<BufferedImage> increasingBI = new ArrayList<>();
+            int numIncreasingFrames = -2;
+
+            if (ms >= minMs) {
+
+                 try {
+                    for (long frame = 0; frame < frames; frame++) {
+                        if (frame <= fps / 2) {
+                            g2d.drawImage(image.getScaledInstance(accX, accY, image.SCALE_FAST), posX, posY, null);
+                            increasingBI.add(Utils.deepCopy(bi2));
+                            accX += scaleX;
+                            accY += scaleY;
+                            frameWriter.addFrame(bi2);
+
+                        } else if (frame > (frames - (fps / 2))) {
+                            // accX -= scaleX;
+                            // accY -= scaleY;
+                            // g2d.drawImage(image.getScaledInstance(accX, accY, image.SCALE_FAST), posX, posY, null);
+                            frameWriter.addFrame(increasingBI.get(numIncreasingFrames));
+                            numIncreasingFrames = numIncreasingFrames - 1;
+
+                        } else {
+                            frameWriter.addFrame(bi2);
+                            numIncreasingFrames = increasingBI.size() - 1;
+                        }
+                    }
+                } catch (final UserException e) {
+                    LOGGER.error("Problems rendering photo '{}'!", photo, e);
                 }
-            } catch (final UserException e) {
-                LOGGER.error("Problems rendering photo '{}'!", photo, e);
+
+
+            } else {
+                try {
+                    for (long frame = 0; frame < frames; frame++) {
+                        frameWriter.addFrame(bi2);
+                    }
+               } catch (final UserException e) {
+                    LOGGER.error("Problems rendering photo '{}'!", photo, e);
+                }
             }
         }
     }
