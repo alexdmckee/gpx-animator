@@ -17,7 +17,7 @@ public class PhotosTest {
     void createFadedInPhoto() {
 
         Photos testee = new Photos(null);
-        ArrayList<BufferedImage> increasingPhoto = new ArrayList<BufferedImage>();
+
 
         int width = 100;
         int height = 100;
@@ -32,7 +32,7 @@ public class PhotosTest {
         final int posX = (bi.getWidth() - photoImage.getWidth()) / 2;
         final int posY = (bi.getHeight() - photoImage.getHeight()) / 2;
 
-        increasingPhoto = testee.createFadedInPhoto(bi, photoImage, g2d, posX, posY, numIncreasingFrames);
+        ArrayList<BufferedImage> increasingPhoto = testee.createFadedInPhoto(bi, photoImage, g2d, posX, posY, numIncreasingFrames);
 
         // Assert we have created the correct number of frames
         assertEquals(numIncreasingFrames, increasingPhoto.size());
