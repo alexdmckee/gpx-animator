@@ -104,60 +104,71 @@ public final class Photos {
         }
     }
 
+    public ArrayList<BufferedImage> createFadedInPhoto(final BufferedImage bi2, final BufferedImage photoImage, final Graphics2D g2d,
+                                                       final int posX, final int posY, final long numIncreasingFrames) {
+
+            int scaleX = (int) ((photoImage.getWidth() - 10) / numIncreasingFrames);
+            int scaleY = (int) ((photoImage.getHeight() - 10) / numIncreasingFrames);
+            int accX = 10;
+            int accY = 10;
+            ArrayList<BufferedImage> increasingBI = new ArrayList<>();
+
+            for (long frame = 0; frame < numIncreasingFrames; frame++) {
+                g2d.drawImage(photoImage.getScaledInstance(accX, accY, photoImage.SCALE_FAST), posX, posY, null);
+                increasingBI.add(Utils.deepCopy(bi2));
+                accX += scaleX;
+                accY += scaleY;
+            }
+            return increasingBI;
+    }
+
     private void renderPhoto(final Photo photo, final Configuration cfg,
                                     final BufferedImage bi, final FrameWriter frameWriter,
                                     final RenderingContext rc, final int pct) {
         rc.setProgress1(pct, String.format(resourceBundle.getString("photos.progress.rendering"), photo.getFile().getName()));
 
-        final BufferedImage image = readPhoto(photo, bi.getWidth(), bi.getHeight());
-        if (image != null) {
+        final BufferedImage photoImage = readPhoto(photo, bi.getWidth(), bi.getHeight());
+        if (photoImage != null) {
             final BufferedImage bi2 = Utils.deepCopy(bi);
             final Graphics2D g2d = bi2.createGraphics();
-            final int posX = (bi.getWidth() - image.getWidth()) / 2;
-            final int posY = (bi.getHeight() - image.getHeight()) / 2;
-           // g2d.drawImage(image, posX, posY, null);
-           // g2d.dispose();
+            final int posX = (bi.getWidth() - photoImage.getWidth()) / 2;
+            final int posY = (bi.getHeight() - photoImage.getHeight()) / 2;
 
             final long ms = cfg.getPhotoTime();
             final long fps = Double.valueOf(cfg.getFps()).longValue();
             final long frames = ms * fps / 1_000;
 
             // fade in photo if frames >= 90
-            // for fps/2 increase image size from 10x10 to full size
+            // for fps/2 increase image size from 10x10 to full size. I.e., fade in/out in 0.5 seconds
 
             // add on (x) each time
-
-            int scaleX = (int) ((image.getWidth() - 10) / (fps / 2));
-            int scaleY = (int) ((image.getHeight() - 10) / (fps / 2));
-            int accX = 10;
-            int accY = 10;
             int minMs = 3000;
-            ArrayList<BufferedImage> increasingBI = new ArrayList<>();
-            int numIncreasingFrames = -2;
+
 
             if (ms >= minMs) {
 
                  try {
-                    for (long frame = 0; frame < frames; frame++) {
-                        if (frame <= fps / 2) {
-                            g2d.drawImage(image.getScaledInstance(accX, accY, image.SCALE_FAST), posX, posY, null);
-                            increasingBI.add(Utils.deepCopy(bi2));
-                            accX += scaleX;
-                            accY += scaleY;
-                            frameWriter.addFrame(bi2);
+                    ArrayList<BufferedImage> increasingPhotoFrames = new ArrayList<BufferedImage>();
+                    final long numIncreasingFrames = (fps / 2);
 
-                        } else if (frame > (frames - (fps / 2))) {
-                            // accX -= scaleX;
-                            // accY -= scaleY;
-                            // g2d.drawImage(image.getScaledInstance(accX, accY, image.SCALE_FAST), posX, posY, null);
-                            frameWriter.addFrame(increasingBI.get(numIncreasingFrames));
-                            numIncreasingFrames = numIncreasingFrames - 1;
+                    increasingPhotoFrames = createFadedInPhoto(bi2, photoImage, g2d, posX, posY, numIncreasingFrames);
 
-                        } else {
-                            frameWriter.addFrame(bi2);
-                            numIncreasingFrames = increasingBI.size() - 1;
-                        }
+                    // fade in photo
+                    for (int frame = 0; frame < increasingPhotoFrames.size(); frame++) {
+                        frameWriter.addFrame(increasingPhotoFrames.get(frame));
                     }
+
+                    // normal size for middle section totalFrames - (fps/2)*2)
+                    // figure how to draw normal photoimage to bi2 full size
+                    for (int frame = 0; frame < (frames - fps); frame++) {
+                        frameWriter.addFrame(bi2);
+                    }
+
+                    // fade out  photo
+                    for (int frame = increasingPhotoFrames.size() - 1; frame >= 0; frame--) {
+                         frameWriter.addFrame(increasingPhotoFrames.get(frame));
+                    }
+
                 } catch (final UserException e) {
                     LOGGER.error("Problems rendering photo '{}'!", photo, e);
                 }
@@ -165,6 +176,7 @@ public final class Photos {
 
             } else {
                 try {
+                    g2d.drawImage(photoImage, posX, posY, null);
                     for (long frame = 0; frame < frames; frame++) {
                         frameWriter.addFrame(bi2);
                     }
